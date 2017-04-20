@@ -4,14 +4,17 @@ containers=()
 
 # Check if ENV variables are set and if not assign them a default value.
 env_pcap_dir=$(printenv PCAP_WRITE_DIR)
-pcap_write_dir=${env_pcap_dir:-"/pcap"}
+pcap_write_dir=${env_pcap_dir:-"pcap/"}
 
 env_sleep_period=$(printenv SLEEP_PERIOD)
 sleep_period=${env_sleep_period:-"5"}
 
+env_container_data_dir=$(printenv CONTAINER_DATA_DIR)
+container_data_dir=${env_container_data_dir:-"containers/"}
 
-# pcap_write_dir=$(printenv PCAP_WRITE_DIR)
-sleep_period=$(printenv SLEEP_PERIOD)
+env_container_data_file=$(printenv CONTAINER_DATA_FILE)
+container_data_file=${env_container_data_filer:-"containers.json"}
+
 
 #/ Usage:
 #/ Description:
@@ -51,6 +54,34 @@ containsTuple() {
 }
 
 
+function analyzeTraffic {
+  # container, interface, container_ip, network_name
+  local cname="$1"
+  local iface="$2"
+  local cip="$3"
+  local netname="$4"
+  local bdir="$5"
+
+  # Check if we are already observe that container
+  containsTuple $cname $iface
+
+  if [ $? != 0 ]; then
+    info "Container ${cname} using network interface: ${iface} not being observed, adding it."
+    containers+=($cname)
+    containers+=($iface)
+
+    mkdir -p $bdir$iface"/"$cname
+
+    # Start capturing traffic in the given interface.
+    # TODO: Change the PERIOD (-G) For an ENV VARIABLE
+    # (-s 0) captures full packets. This is slower but there will be no incomplete packets.
+    tcpdump -s 0 -i $iface -G 5 -w $bdir$iface"/"$cname"/"$cname"_"$iface"_%Y-%m-%d_%H:%M:%S.pcap" host $cip &
+
+  fi
+}
+
+
+
 #####################
 # Start of the script
 #####################
@@ -60,32 +91,34 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
     # Create directory to write generated pcaps.
     mkdir -p $pcap_write_dir
 
+    # Get the length of the containers array
+    container_count=$(cat $container_data_dir$container_data_file | jq '. | length')
+
     while :
     do
 
-      info "Watch the wlp3s0 interface"
-      containsTuple "testcontainer" "wlp3s0"
+      # Read the containers.json file
+      # Parse the info: cname, interface, ip, network_name
+      # Check if already observed
+      # If not, drop tcpdump + add the container to be observed.
+      for i in $(seq 0 $((container_count-1)))
+      do
+        cname=$(cat $container_data_dir$container_data_file | jq ".[${i}] .name")
+        network_name=$(cat $container_data_dir$container_data_file | jq ".[${i}] .data .network_name")
+        ip_address=$(cat $container_data_dir$container_data_file | jq ".[${i}] .data .ipAddress")
+        interface_id=$(cat $container_data_dir$container_data_file | jq ".[${i}] .data .interface_id")
 
-      if [ $? != 0 ]; then
-        info "Watching for wlp3s0"
-        tcpdump -i wlp3s0 -s 0 -w "data/pcap/webcat_default_br-1234_%Y-%m-%d_%H:%M:%S.pcap" &
+        # Find the host interface that connects to the network the docker is running in.
+        for host_iface in `netstat -i | grep br | awk '{ print $1 }'`; do
+          echo $host_iface | awk -F'-' '{ print $2 }'
+          if [[ "$interface_id" == *$(echo $host_iface | awk -F'-' '{ print $2 }')* ]]; then
+            echo "its hip to be square"
+            # analyzeTraffic $cname $host_iface $ip_address $network_name $pcap_write_dir
+          fi
+          echo $host_iface
+        done
 
-        containers+=("testcontainer")
-        containers+=("wlp3s0")
-      fi
-
-
-      info "Watch the br-34ccce3029a6 interface"
-      containsTuple "testcontainer" "br-34ccce3029a6"
-
-      if [ $? != 0 ]; then
-        info "Watching for br-34ccce3029a6"
-        tcpdump -i br-34ccce3029a6 -s 0 -w "data/pcap/webcat_default_br-5678_%Y-%m-%d_%H:%M:%S.pcap" &
-
-        containers+=("testcontainer")
-        containers+=("br-34ccce3029a6")
-      fi
-
+      done
 
       sleep $sleep_period
     done
