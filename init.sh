@@ -103,19 +103,20 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
       # If not, drop tcpdump + add the container to be observed.
       for i in $(seq 0 $((container_count-1)))
       do
-        cname=$(cat $container_data_dir$container_data_file | jq ".[${i}] .name")
-        network_name=$(cat $container_data_dir$container_data_file | jq ".[${i}] .data .network_name")
-        ip_address=$(cat $container_data_dir$container_data_file | jq ".[${i}] .data .ipAddress")
-        interface_id=$(cat $container_data_dir$container_data_file | jq ".[${i}] .data .interface_id")
+        cname=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .name")
+        network_name=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .network_name")
+        ip_address=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .ipAddress")
+        interface_id=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .interface_id")
+
 
         # Find the host interface that connects to the network the docker is running in.
         for host_iface in `netstat -i | grep br | awk '{ print $1 }'`; do
-          echo $host_iface | awk -F'-' '{ print $2 }'
+
           if [[ "$interface_id" == *$(echo $host_iface | awk -F'-' '{ print $2 }')* ]]; then
-            echo "its hip to be square"
-            # analyzeTraffic $cname $host_iface $ip_address $network_name $pcap_write_dir
+            analyzeTraffic $cname $host_iface $ip_address $network_name $pcap_write_dir
+          elif [[ "$network_name" == "bridge" ]]; then
+            analyzeTraffic $cname "docker0" $ip_address $network_name $pcap_write_dir
           fi
-          echo $host_iface
         done
 
       done
