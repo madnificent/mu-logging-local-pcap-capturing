@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
+
 containers=()
+
+# Check if ENV variables are set and if not assign them a default value.
+env_pcap_dir=$(printenv PCAP_WRITE_DIR)
+pcap_write_dir=${env_pcap_dir:-"/pcap"}
+
+env_sleep_period=$(printenv SLEEP_PERIOD)
+sleep_period=${env_sleep_period:-"5"}
+
+
+# pcap_write_dir=$(printenv PCAP_WRITE_DIR)
+sleep_period=$(printenv SLEEP_PERIOD)
 
 #/ Usage:
 #/ Description:
@@ -9,12 +21,10 @@ containers=()
 usage() { grep '^#/' "$0" | cut -c4- ; exit 0 ; }
 expr "$*" : ".*--help" > /dev/null && usage
 
-readonly LOG_FILE="/tmp/$(basename "$0").log"
-info()    { echo "[INFO]    $@" | tee -a "$LOG_FILE" >&2 ; }
-warning() { echo "[WARNING] $@" | tee -a "$LOG_FILE" >&2 ; }
-error()   { echo "[ERROR]   $@" | tee -a "$LOG_FILE" >&2 ; }
-fatal()   { echo "[FATAL]   $@" | tee -a "$LOG_FILE" >&2 ; exit 1 ; }
+# Convenience logging function.
+info()    { echo "[INFO]    $@"  ; }
 
+# Cleanup files after exiting the script.
 cleanup() {
   echo "Cleanup logic here"
   exit 0
@@ -40,17 +50,19 @@ containsTuple() {
   return 1
 }
 
-mkdir -p data/pcap
-
 
 #####################
 # Start of the script
 #####################
 if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
-    # trap cleanup EXIT
+    trap cleanup EXIT TERM INT
+
+    # Create directory to write generated pcaps.
+    mkdir -p $pcap_write_dir
 
     while :
     do
+
       info "Watch the wlp3s0 interface"
       containsTuple "testcontainer" "wlp3s0"
 
@@ -75,6 +87,6 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
       fi
 
 
-      sleep 3
+      sleep $sleep_period
     done
 fi

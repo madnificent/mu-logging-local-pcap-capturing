@@ -1,7 +1,8 @@
 FROM debian
 MAINTAINER esteban.sastre@tenforce.com
 
-ENV PCAP_READ_DIR '/data'
+ENV PCAP_WRITE_DIR '/data'
+ENV SLEEP_PERIOD '5'
 
 RUN apt-get update && apt-get -y -q install \
     tcpdump supervisor && \
