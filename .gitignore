@@ -1,2 +1,3 @@
 # Supervisord log files
-supervisord.*
+supervisord.log
+supervisord.pid

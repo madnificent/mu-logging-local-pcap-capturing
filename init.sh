@@ -91,11 +91,12 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
     # Create directory to write generated pcaps.
     mkdir -p $pcap_write_dir
 
-    # Get the length of the containers array
-    container_count=$(cat $container_data_dir$container_data_file | jq '. | length')
-
     while :
     do
+      info "Iterate over each container of the file containers.json"
+
+      # Get the length of the containers array
+      container_count=$(cat $container_data_dir$container_data_file | jq '. | length')
 
       # Read the containers.json file
       # Parse the info: cname, interface, ip, network_name
@@ -107,7 +108,6 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
         network_name=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .network_name")
         ip_address=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .ipAddress")
         interface_id=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .interface_id")
-
 
         # Find the host interface that connects to the network the docker is running in.
         for host_iface in `netstat -i | grep br | awk '{ print $1 }'`; do
@@ -121,6 +121,7 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
 
       done
 
+      info "Sleep for ${sleep_period} seconds."
       sleep $sleep_period
     done
 fi
