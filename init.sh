@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+export PCAP_WRITE_DIR='../pcap/'
+export CONTAINER_DATA_DIR='../containers/'
+export CONTAINER_DATA_FILE='containers.json'
+export SLEEP_PERIOD='5'
+
 containers=()
 
 # Check if ENV variables are set and if not assign them a default value.
@@ -71,12 +76,12 @@ function analyzeTraffic {
     containers+=($iface)
 
     mkdir -p $bdir$iface"/"$cname
+    chmod a+rwx $bdir$iface"/"$cname
 
     # Start capturing traffic in the given interface.
     # TODO: Change the PERIOD (-G) For an ENV VARIABLE
     # (-s 0) captures full packets. This is slower but there will be no incomplete packets.
     tcpdump -s 0 -i $iface -G 5 -w $bdir$iface"/"$cname"/"$cname"_"$iface"_%Y-%m-%d_%H:%M:%S.pcap" host $cip &
-
   fi
 }
 
@@ -110,7 +115,7 @@ if [[ "${BASH_SOURCE[0]}" = "$0" ]]; then
         interface_id=$(cat $container_data_dir$container_data_file | jq -r ".[${i}] .data .interface_id")
 
         # Find the host interface that connects to the network the docker is running in.
-        for host_iface in `netstat -i | grep br | awk '{ print $1 }'`; do
+        for host_iface in `ifconfig | grep -P -o "br-[0-9a-f]+" | awk '{ print $1 }'`; do
 
           if [[ "$interface_id" == *$(echo $host_iface | awk -F'-' '{ print $2 }')* ]]; then
             analyzeTraffic $cname $host_iface $ip_address $network_name $pcap_write_dir
